@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: dltHub experiments artifacts deployment
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+
+Outputs:
+  BucketName:
+    Value: !Ref Bucket
+    Export: 
+      Name: !Sub "${AWS::StackName}-BucketName"
+  BucketARN:
+    Value: !GetAtt Bucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketARN"
