@@ -52,7 +52,7 @@ need to make sure the package exists in S3 first.
 aws cloudformation create-stack \
 		--stack-name dlt-experiments-lambda-1 \
 		--template-body file://./templates/cloudformation-lambda.yaml \
-        --parameters ParameterKey=ArtifactsStackName,ParameterValue=dlt-experiments-artifacts-1 ParameterKey=OpenAIAPIToken,ParameterValue=DEADBEEF\
+        --parameters ParameterKey=ArtifactsStackName,ParameterValue=dlt-experiments-artifacts-1 \
 		--profile my-profile \
 		--region eu-central-1 \
 		--capabilities CAPABILITY_IAM

@@ -4,75 +4,12 @@ Description: dltHub experiments AWS Lambda stack
 Parameters:
   ArtifactsStackName:
     Type: String
-  APIGatewayName:
-    Type: String
-    Default: dlt-experiments
-  APIGatewayStageName:
-    Type: String
-    AllowedPattern: "[a-z0-9]+"
-    Default: internal
-  APIGatewayHTTPMethod:
-    Type: String
-    Default: POST
   LambdaFunctionName:
     Type: String
     AllowedPattern: "[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+"
     Default: post-dlt-experiments
 
 Resources:
-  APIGatewayAccountConfig:
-    Type: AWS::ApiGateway::Account
-    Properties:
-      CloudWatchRoleArn: !GetAtt APIGatewayLoggingRole.Arn
-
-  APIGateway:
-    Type: AWS::ApiGateway::RestApi
-    DependsOn:
-      - APIGatewayAccountConfig
-    Properties:
-      Description: post-dlt-experiments API gateway
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
-      Name: !Ref APIGatewayName
-
-  APIGatewayRootMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      AuthorizationType: NONE
-      HttpMethod: !Ref APIGatewayHTTPMethod
-      Integration:
-        IntegrationHttpMethod: POST
-        Type: AWS
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-          - LambdaArn: !GetAtt LambdaFunction.Arn
-      ResourceId: !GetAtt APIGateway.RootResourceId
-      RestApiId: !Ref APIGateway
-
-  APIGatewayDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - APIGatewayRootMethod
-    Properties:
-      RestApiId: !Ref APIGateway
-
-  APIGatewayStage:
-    Type: AWS::ApiGateway::Stage
-    DependsOn:
-      - APIGatewayDeployment
-    Properties:
-      RestApiId: !Ref APIGateway
-      DeploymentId: !Ref APIGatewayDeployment
-      StageName: !Ref APIGatewayStageName
-      AccessLogSetting:
-        DestinationArn: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/${APIGatewayName}
-        Format: "{ \"requestId\":\"$context.requestId\", \"ip\": \"$context.identity.sourceIp\", \"caller\":\"$context.identity.caller\", \"user\":\"$context.identity.user\",\"requestTime\":\"$context.requestTime\", \"httpMethod\":\"$context.httpMethod\",\"resourcePath\":\"$context.resourcePath\", \"status\":\"$context.status\",\"protocol\":\"$context.protocol\", \"responseLength\":\"$context.responseLength\" }"
-      MethodSettings:
-        - HttpMethod: GET
-          LoggingLevel: ERROR
-          ResourcePath: /
-
   LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -88,15 +25,19 @@ Resources:
       Runtime: python3.11
       Timeout: 60
 
-  LambdaAPIGatewayInvoke:
-    Type: AWS::Lambda::Permission
+  LambdaInboxRolePolicy:
+    Type: AWS::IAM::RolePolicy
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt LambdaFunction.Arn
-      Principal: apigateway.amazonaws.com
-        # note: if route *not* at API Gateway root, `SourceArn` would take the form of:
-        #               arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/${apiGatewayStageName}/${apiGatewayHTTPMethod}/PATH_PART
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/${APIGatewayStageName}/${APIGatewayHTTPMethod}/
+      RoleName: !Ref LambdaIAMRole
+      PolicyName: s3-inbox
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+            - s3:GetItem
+            Effect: Allow
+            Resource:
+              - !GetAtt InboxBucket.Arn
 
   LambdaIAMRole:
     Type: AWS::IAM::Role
@@ -122,7 +63,7 @@ Resources:
                 Effect: Allow
                 Resource:
                   - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${LambdaFunctionName}:*
-        - PolicyName: s3
+        - PolicyName: s3-code
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -133,35 +74,21 @@ Resources:
                   - !ImportValue 
                       'Fn::Sub': '${ArtifactsStackName}-BucketARN'
 
-  APIGatewayLoggingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "apigateway.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Path: "/"
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
-
   LambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${LambdaFunctionName}
       RetentionInDays: 5
 
-  APIGatewayLogGroup:
-    Type: AWS::Logs::LogGroup
+  InboxBucket:
+    Type: AWS::S3::Bucket
     Properties:
-      LogGroupName: !Sub /aws/apigateway/${APIGatewayName}
-      RetentionInDays: 5
+      NotificationSettings: 
+        - Event: s3:ObjectCreated:*
+          Function: !Ref LambdaFunction
 
 Outputs:
-  APIGatewayInvokeURL:
-    Value: !Sub https://${APIGateway}.execute-api.${AWS::Region}.amazonaws.com/${APIGatewayStageName}
   LambdaArn:
     Value: !GetAtt LambdaFunction.Arn
+  InboxBucketArn:
+    Value: !GetAtt InboxBucket.Arn

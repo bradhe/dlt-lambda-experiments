@@ -1,6 +1,8 @@
 ARTIFACT_NAME ?= post-dlt-experiments.zip
 ARTIFACT_PATH ?= ./bin/${ARTIFACT_NAME}
-BUCKET_NAME ?= 
+
+# NOTE: This is copied from my local configuration.
+BUCKET_NAME ?= dlt-experiments-artifacts-1-bucket-hd6jvq9rjlad
 
 AWS_REGION ?= eu-central-1
 AWS_PROFILE ?= bradhe
@@ -16,8 +18,7 @@ clean:
 
 build: clean
 	pip install -r requirements.txt --target ./bin
-	cp -R planner ./bin/planner
-	cp func.py ./bin/func.py
+	cp *.py ./bin
 
 package: build
 	cd ./bin && zip -r ${ARTIFACT_NAME} ./*
