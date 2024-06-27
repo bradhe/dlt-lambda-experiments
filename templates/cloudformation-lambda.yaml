@@ -19,7 +19,7 @@ Resources:
         S3Key: post-dlt-experiments.zip
       Description: post-dlt-experiments Function
       FunctionName: !Ref LambdaFunctionName
-      Handler: func.lambda_handler
+      Handler: lambda.lambda_handler
       MemorySize: 128
       Role: !GetAtt LambdaIAMRole.Arn
       Runtime: python3.11
